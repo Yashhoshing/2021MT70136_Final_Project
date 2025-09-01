@@ -87,10 +87,11 @@ const TaskCreate = ({ onTaskCreated, initialTask }) => {
         value={newTask.status}
         onChange={handleChange}
         style={{ margin: 6, padding: 6 }}
+        disabled={!isEdit}
       >
         <option>To Do</option>
-        <option>In Progress</option>
-        <option>Done</option>
+        {isEdit && <option>In Progress</option>}
+        {isEdit && <option>Done</option>}
       </select>
 
       {newTask.status === "In Progress" && (

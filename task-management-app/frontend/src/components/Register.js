@@ -4,11 +4,12 @@ import axios from "axios";
 const Register = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("User");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:8000/register", { username, password });
+  await axios.post("http://localhost:8000/register", { username, password, role });
       alert("Registration successful! Please login.");
       window.location.href = "/login";
     } catch {
@@ -30,6 +31,11 @@ const Register = () => {
         <div className="register-title">Register</div>
         <input className="register-input" type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} required />
         <input className="register-input" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+        <select className="register-input" value={role} onChange={e => setRole(e.target.value)} required>
+          <option value="User">User</option>
+          <option value="Admin">Admin</option>
+          <option value="Guest">Guest</option>
+        </select>
         <button className="register-btn" type="submit">Register</button>
       </form>
     </div>
