@@ -45,6 +45,7 @@ const ProgressBar = ({ progress, status }) => {
 const TaskList = () => {
   const [tasks, setTasks] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [selectedTaskIdx, setSelectedTaskIdx] = useState(0);
   const [selectedTask, setSelectedTask] = useState(null);
 
   const token = localStorage.getItem("token");
@@ -58,8 +59,29 @@ const TaskList = () => {
       .get("http://localhost:8001/tasks", {
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((res) => setTasks(res.data));
+      .then((res) => {
+        setTasks(res.data);
+        // Ensure selectedTaskIdx is always valid
+        setSelectedTaskIdx(idx => {
+          if (res.data.length === 0) return 0;
+          if (idx >= res.data.length) return res.data.length - 1;
+          return idx;
+        });
+      });
   }, [token]);
+
+  // Tab switching handler
+  const handleTabClick = (idx) => {
+    setSelectedTaskIdx(idx);
+    setSelectedTask(null);
+    setShowForm(false);
+  };
+
+  // Show form for editing selected task
+  const handleEditClick = () => {
+    setSelectedTask(tasks[selectedTaskIdx]);
+    setShowForm(true);
+  };
 
   return (
     <div
@@ -71,12 +93,13 @@ const TaskList = () => {
     >
       <div
         style={{
-          maxWidth: 600,
+          maxWidth: 1000,
+          minHeight: 700,
           margin: "0 auto",
           background: "#fff",
           borderRadius: 16,
           boxShadow: "0 8px 48px rgba(76,68,182,0.13)",
-          padding: 32,
+          padding: 48,
         }}
       >
         <h2 style={{ color: "#434190" }}>Your Tasks</h2>
@@ -91,10 +114,66 @@ const TaskList = () => {
             cursor: "pointer",
             fontWeight: 600,
           }}
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            if (showForm) {
+              setShowForm(false);
+              setSelectedTask(null);
+            } else {
+              setShowForm(true);
+              setSelectedTask(null); // Always open blank form for Add Task
+            }
+          }}
         >
           {showForm ? "Cancel" : "Add Task"}
         </button>
+        {/* Tabs for each task */}
+  <div style={{ display: "flex", gap: 8, marginBottom: 24, overflowX: "auto", flexWrap: "nowrap" }}>
+          {tasks.map((task, idx) => (
+            <button
+              key={task.id}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: selectedTaskIdx === idx ? "2px solid #667eea" : "1px solid #e0e7ef",
+                background: selectedTaskIdx === idx ? "#e0e7ff" : "#f8fafc",
+                color: selectedTaskIdx === idx ? "#434190" : "#555",
+                fontWeight: selectedTaskIdx === idx ? 700 : 500,
+                cursor: "pointer",
+                minWidth: 80,
+                transition: "all 0.2s",
+              }}
+              onClick={() => handleTabClick(idx)}
+            >
+              {task.title}
+            </button>
+          ))}
+        </div>
+        {/* Show selected task details */}
+        {tasks.length > 0 && !showForm && (
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ color: "#667eea", marginBottom: 8 }}>{tasks[selectedTaskIdx].title}</h3>
+            <div style={{ marginBottom: 8 }}><strong>Description:</strong> {tasks[selectedTaskIdx].description}</div>
+            <div style={{ marginBottom: 8 }}><strong>Created At:</strong> {new Date(tasks[selectedTaskIdx].created_at).toLocaleString()}</div>
+            <div style={{ marginBottom: 8 }}><strong>Status:</strong> {tasks[selectedTaskIdx].status}</div>
+            <div style={{ marginBottom: 8 }}><strong>Progress:</strong> <ProgressBar progress={tasks[selectedTaskIdx].progress} status={tasks[selectedTaskIdx].status} /></div>
+            <button
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                padding: "8px 16px",
+                marginTop: 8,
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+              onClick={handleEditClick}
+            >
+              Edit Task
+            </button>
+          </div>
+        )}
+        {/* Show form for add/edit */}
         {showForm && (
           <TaskCreate
             onTaskCreated={() => {
@@ -105,55 +184,15 @@ const TaskList = () => {
                 .get("http://localhost:8001/tasks", {
                   headers: { Authorization: `Bearer ${token}` },
                 })
-                .then((res) => setTasks(res.data));
+                .then((res) => {
+                  setTasks(res.data);
+                  // If there are tasks, select the last one, else select 0
+                  setSelectedTaskIdx(res.data.length > 0 ? res.data.length - 1 : 0);
+                });
             }}
             initialTask={selectedTask}
           />
         )}
-        <table
-          style={{ width: "100%", marginTop: 24, borderCollapse: "collapse" }}
-        >
-          <thead>
-            <tr style={{ background: "#f3f0ff" }}>
-              <th style={{ padding: 8, textAlign: "left" }}>Name</th>
-              <th style={{ padding: 8, textAlign: "left" }}>Description</th>
-              <th style={{ padding: 8, textAlign: "left" }}>Created At</th>
-              <th style={{ padding: 8, textAlign: "left" }}>Progress</th>
-              <th style={{ padding: 8, textAlign: "left" }}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((task) => (
-              <tr key={task.id} style={{ borderBottom: "1px solid #ede9fe" }}>
-                <td style={{ padding: 8 }}>
-                  <a
-                    href="#"
-                    style={{
-                      color: "#5a67d8",
-                      textDecoration: "underline",
-                      cursor: "pointer",
-                    }}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setSelectedTask(task);
-                      setShowForm(true);
-                    }}
-                  >
-                    {task.title}
-                  </a>
-                </td>
-                <td style={{ padding: 8 }}>{task.description}</td>
-                <td style={{ padding: 8 }}>
-                  {new Date(task.created_at).toLocaleString()}
-                </td>
-                <td style={{ padding: 8, minWidth: 120 }}>
-                  <ProgressBar progress={task.progress} status={task.status} />
-                </td>
-                <td style={{ padding: 8 }}>{task.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );

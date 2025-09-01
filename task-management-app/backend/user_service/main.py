@@ -72,7 +72,9 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if get_user(db, user.username):
         raise HTTPException(status_code=400, detail="Username already registered")
     hashed_password = get_password_hash(user.password)
-    user_obj = models.User(username=user.username, hashed_password=hashed_password)
+    # Accept role if provided, else default to 'User'
+    role = getattr(user, "role", "User")
+    user_obj = models.User(username=user.username, hashed_password=hashed_password, role=role)
     db.add(user_obj)
     db.commit()
     db.refresh(user_obj)
@@ -83,7 +85,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     user = get_user(db, form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
-    token = create_access_token({"sub": user.username})
+    token = create_access_token({"sub": user.username, "role": user.role})
     return {"access_token": token, "token_type": "bearer"}
 
 @app.get("/me", response_model=schemas.UserOut)
