@@ -10,6 +10,7 @@ function App() {
     <BrowserRouter>
       <Routes>
   <Route path="/register" element={<Register />} />
+  <Route path="/admin/register" element={<Register isAdminRegister={true} />} />
   <Route path="/login" element={<Login />} />
   <Route path="/tasks" element={<TaskList />} />
   <Route path="/users" element={<UserList />} />

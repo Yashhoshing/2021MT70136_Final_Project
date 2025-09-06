@@ -5,11 +5,17 @@
   "main": "index.js",
   "scripts": {
     "start": "react-scripts start",
-    "test": "react-scripts test"
+    "build": "react-scripts build",
+    "test": "jest",
+    "test:auth": "jest tests/auth.test.js",
+    "test:report": "jest --reporters=default --reporters=jest-html-reporter"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.2",
     "axios": "^1.4.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
@@ -29,6 +35,10 @@
     ]
   },
   "devDependencies": {
+    "@babel/core": "^7.28.3",
+    "@babel/preset-env": "^7.28.3",
+    "babel-jest": "^30.1.2",
+    "jest-html-reporter": "^4.3.0",
     "nodemon": "^3.1.10"
   }
 }
