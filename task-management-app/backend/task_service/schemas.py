@@ -6,6 +6,7 @@ class TaskCreate(BaseModel):
     title: str
     description: Optional[str] = None
     status: str = Field(default="To Do")
+    owner: Optional[str] = None  # Only admin can set this
     # progress should not be set on creation; default 0
 
 class TaskUpdate(BaseModel):

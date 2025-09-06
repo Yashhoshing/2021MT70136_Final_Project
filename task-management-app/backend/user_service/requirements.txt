@@ -5,3 +5,9 @@ pydantic
 python-jose
 python-multipart
 bcrypt
+passlib
+pytest 
+fastapi
+pytest-html
+httpx
+bcrypt

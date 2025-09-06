@@ -2,6 +2,8 @@ from fastapi import FastAPI, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from . import models, schemas, database
+# from task_service import models, schemas, database
+# import models, database, schemas
 import sys
 sys.path.append(r"C:\Users\Lenovo\Desktop\Bits\Project\task-management-app\backend\user_service")
 import models as user_models
@@ -49,19 +51,23 @@ def get_current_user_and_role(authorization: str = Header(...)):
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or missing JWT")
 
+# @app.post("/tasks", response_model=schemas.TaskOut)
 @app.post("/tasks", response_model=schemas.TaskOut)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db), user_and_role: tuple = Depends(get_current_user_and_role)):
     """
-    Create a new task for the authenticated user.
+    Create a new task for the authenticated user, or for any user if Admin.
+    If admin, can specify owner in the request body.
     """
     username, role = user_and_role
+    # If admin and task.owner is provided, use it. Otherwise, use current user.
+    task_owner = task.owner if (role == "Admin" and task.owner) else username
     try:
         db_task = models.Task(
             title=task.title,
             description=task.description,
             status=task.status if task.status else "To Do",
             progress=0,  # Always set to 0 for new tasks
-            owner=username
+            owner=task_owner
         )
         db.add(db_task)
         db.commit()
@@ -70,17 +76,44 @@ def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db), user_an
     except Exception as e:
         print("Error creating task:", e)
         raise HTTPException(status_code=400, detail=f"Failed to create task: {e}")
+# Endpoint to delete a user (admin only)
+@app.delete("/users/{username}")
+def delete_user(username: str, user_and_role: tuple = Depends(get_current_user_and_role), db: Session = Depends(get_db)):
+    _, role = user_and_role
+    if role != "Admin":
+        raise HTTPException(status_code=403, detail="Only admin can delete users")
+    user_db = user_database.SessionLocal()
+    try:
+        user = user_db.query(user_models.User).filter(user_models.User.username == username).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        # Delete all tasks for this user
+        db.query(models.Task).filter(models.Task.owner == username).delete()
+        db.commit()
+        user_db.delete(user)
+        user_db.commit()
+        return {"detail": f"User '{username}' and their tasks deleted"}
+    finally:
+        user_db.close()
 
 
 @app.get("/tasks", response_model=list[schemas.TaskOut])
-def get_tasks(db: Session = Depends(get_db), user_and_role: tuple = Depends(get_current_user_and_role)):
+def get_tasks(db: Session = Depends(get_db), user_and_role: tuple = Depends(get_current_user_and_role), user: str = None):
     username, role = user_and_role
-    return db.query(models.Task).filter(models.Task.owner == username).all()
+    if role == "Admin" and user:
+        return db.query(models.Task).filter(models.Task.owner == user).all()
+    elif role == "Admin":
+        return db.query(models.Task).all()
+    else:
+        return db.query(models.Task).filter(models.Task.owner == username).all()
 
 @app.get("/tasks/{task_id}", response_model=schemas.TaskOut)
 def get_task(task_id: int, db: Session = Depends(get_db), user_and_role: tuple = Depends(get_current_user_and_role)):
     username, role = user_and_role
-    task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner == username).first()
+    if role == "Admin":
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    else:
+        task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner == username).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
@@ -88,9 +121,13 @@ def get_task(task_id: int, db: Session = Depends(get_db), user_and_role: tuple =
 from datetime import datetime
 
 @app.put("/tasks/{task_id}", response_model=schemas.TaskOut)
+@app.put("/tasks/{task_id}", response_model=schemas.TaskOut)
 def update_task(task_id: int, update: schemas.TaskUpdate, db: Session = Depends(get_db), user_and_role: tuple = Depends(get_current_user_and_role)):
     username, role = user_and_role
-    db_task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner == username).first()
+    if role == "Admin":
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    else:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner == username).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -138,14 +175,15 @@ def update_task(task_id: int, update: schemas.TaskUpdate, db: Session = Depends(
 
 
 @app.delete("/tasks/{task_id}")
+@app.delete("/tasks/{task_id}")
 def delete_task(task_id: int, db: Session = Depends(get_db), user_and_role: tuple = Depends(get_current_user_and_role)):
     username, role = user_and_role
-    # Only Admin can delete any task, User can delete their own
-    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if role == "Admin":
+        db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    else:
+        db_task = db.query(models.Task).filter(models.Task.id == task_id, models.Task.owner == username).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if role != "Admin" and db_task.owner != username:
-        raise HTTPException(status_code=403, detail="Not allowed to delete this task")
     db.delete(db_task)
     db.commit()
     return {"detail": "Task deleted"}

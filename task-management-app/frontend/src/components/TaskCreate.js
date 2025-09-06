@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { Box, Button, TextField, MenuItem, CircularProgress, Autocomplete, Snackbar, Alert } from "@mui/material";
 
-const TaskCreate = ({ onTaskCreated, initialTask }) => {
+const TaskCreate = ({ onTaskCreated, initialTask, isAdmin, users }) => {
   const isEdit = !!initialTask;
   const [newTask, setNewTask] = useState({
     title: initialTask?.title || "",
@@ -9,11 +10,12 @@ const TaskCreate = ({ onTaskCreated, initialTask }) => {
     status: initialTask?.status || "To Do",
     progress: initialTask?.progress ?? 0,
     id: initialTask?.id,
+    owner: initialTask?.owner || ""
   });
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const token = localStorage.getItem("token");
 
-  // Update form when initialTask changes
   useEffect(() => {
     if (initialTask) {
       setNewTask({
@@ -22,21 +24,26 @@ const TaskCreate = ({ onTaskCreated, initialTask }) => {
         status: initialTask.status || "To Do",
         progress: initialTask.progress ?? 0,
         id: initialTask.id,
+        owner: initialTask.owner || ""
       });
     } else {
-      setNewTask({ title: "", description: "", status: "To Do", progress: 0 });
+      setNewTask({ title: "", description: "", status: "To Do", progress: 0, owner: "" });
     }
   }, [initialTask]);
 
-  // Reset progress when status changes
   useEffect(() => {
     if (newTask.status !== "In Progress") {
       setNewTask((prev) => ({ ...prev, progress: 0 }));
     }
   }, [newTask.status]);
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
     setNewTask({ ...newTask, [e.target.name]: e.target.value });
+  };
+
+  const handleOwnerChange = (_, value) => {
+    setNewTask({ ...newTask, owner: value ? value.username : "" });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,89 +53,100 @@ const TaskCreate = ({ onTaskCreated, initialTask }) => {
       if (payload.status !== "In Progress") {
         delete payload.progress;
       }
+      if (isAdmin && users && users.length > 0 && !isEdit) {
+        payload.owner = newTask.owner || users[0].username;
+      }
       if (isEdit && newTask.id) {
-        // Edit mode: update task
         await axios.put(`http://localhost:8001/tasks/${newTask.id}`, payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       } else {
-        // Create mode: create new task
         await axios.post("http://localhost:8001/tasks", payload, {
           headers: { Authorization: `Bearer ${token}` },
         });
       }
+      setSnackbar({ open: true, message: "Task saved!", severity: "success" });
       if (onTaskCreated) onTaskCreated();
     } catch (error) {
-      console.error("Error saving task:", error);
-      alert("Failed to save task");
+      setSnackbar({ open: true, message: "Failed to save task", severity: "error" });
     }
     setLoading(false);
   };
 
+  // Only allow normal users to edit progress (not title/description/status) when editing a task
+  const isNormalUser = !isAdmin;
+  const isNormalUserEdit = isNormalUser && isEdit;
+
   return (
-    <form onSubmit={handleSubmit}>
-      <input
+    <Box component="form" onSubmit={handleSubmit} sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2500}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert severity={snackbar.severity} sx={{ width: "100%" }}>{snackbar.message}</Alert>
+      </Snackbar>
+      {isAdmin && !isEdit && (
+        <Autocomplete
+          options={users}
+          getOptionLabel={u => u.username}
+          value={users.find(u => u.username === newTask.owner) || null}
+          onChange={handleOwnerChange}
+          renderInput={params => <TextField {...params} label="Assign to user" required />}
+          isOptionEqualToValue={(option, value) => option?.username === value?.username}
+          sx={{ minWidth: 220 }}
+        />
+      )}
+      <TextField
         name="title"
-        placeholder="Title"
+        label="Title"
         required
-        style={{ margin: 6, padding: 6 }}
         value={newTask.title}
         onChange={handleChange}
+        disabled={isNormalUserEdit}
       />
-      <input
+      <TextField
         name="description"
-        placeholder="Description"
-        style={{ margin: 6, padding: 6 }}
+        label="Description"
         value={newTask.description}
         onChange={handleChange}
+        disabled={isNormalUserEdit}
       />
-      <select
+      <TextField
+        select
         name="status"
+        label="Status"
         value={newTask.status}
         onChange={handleChange}
-        style={{ margin: 6, padding: 6 }}
-        disabled={!isEdit}
+        required
+        disabled={isNormalUserEdit}
       >
-        <option>To Do</option>
-        {isEdit && <option>In Progress</option>}
-        {isEdit && <option>Done</option>}
-      </select>
-
-      {newTask.status === "In Progress" && (
-        <input
+        <MenuItem value="To Do">To Do</MenuItem>
+        <MenuItem value="In Progress">In Progress</MenuItem>
+        <MenuItem value="Done">Done</MenuItem>
+      </TextField>
+      {((isNormalUserEdit && newTask.status === "In Progress") || (isAdmin && isEdit && newTask.status === "In Progress") || (isAdmin && !isEdit && newTask.status === "In Progress")) && (
+        <TextField
           type="number"
-          min="0"
-          max="100"
           name="progress"
+          label="Progress %"
           value={newTask.progress}
           onChange={handleChange}
-          placeholder="Progress %"
-          style={{ margin: 6, padding: 6 }}
+          inputProps={{ min: 0, max: 100 }}
           required
         />
       )}
-
-      <button
+      <Button
         type="submit"
-        style={{
-          background: "#a18cd1",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          padding: "8px 18px",
-          marginLeft: 6,
-        }}
-        disabled={loading}
+        variant="contained"
+        color="primary"
+        sx={{ borderRadius: 2, fontWeight: 600, px: 3, boxShadow: 1 }}
+        disabled={loading || (isNormalUser && !isEdit)}
       >
-        {isEdit
-          ? loading
-            ? "Saving..."
-            : "Save"
-          : loading
-          ? "Creating..."
-          : "Create"}
-      </button>
-    </form>
+        {loading ? <CircularProgress size={22} color="inherit" /> : isEdit ? "Save" : "Create"}
+      </Button>
+    </Box>
   );
 };
 
