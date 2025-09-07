@@ -21,12 +21,12 @@ const Register = ({ isAdminRegister }) => {
         isAdminUser = false;
       }
     }
-    axios.get("http://localhost:8001/me")
+    axios.get("http://localhost:8000/me")
       .then(() => {
         setIsAdmin(isAdminUser);
       })
       .catch(() => {
-        axios.get("http://localhost:8001/users/count")
+        axios.get("http://localhost:8000/users/count")
           .then(res => {
             if (res.data.count === 0) {
               setIsAdmin(true);
@@ -44,6 +44,7 @@ const Register = ({ isAdminRegister }) => {
     try {
       const token = localStorage.getItem("token");
       const countRes = await axios.get("http://localhost:8000/users/count");
+      console.log("User count:", countRes.data.count);
       if (countRes.data.count === 0) {
         await axios.post("http://localhost:8000/register", { username, password, role });
       } else {
