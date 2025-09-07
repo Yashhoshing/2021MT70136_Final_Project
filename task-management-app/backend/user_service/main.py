@@ -94,6 +94,7 @@ def admin_register(user: schemas.UserCreate, db: Session = Depends(get_db), toke
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         role = payload.get("role", "User")
+        print("Admin register attempt by:", username, "with role:", role)
         if role != "Admin":
             raise HTTPException(status_code=403, detail="Only Admin can register new users")
     except JWTError:

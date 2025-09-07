@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import TaskCreate from "./TaskCreate";
+import AdminDashboard from "./AdminDashboard";
 import {
   Box,
   Button,
@@ -18,7 +19,8 @@ import {
   Tabs,
   Tab,
   Autocomplete,
-  TextField
+  TextField,
+  Divider
 } from "@mui/material";
 import { styled, useTheme } from "@mui/material/styles";
 
@@ -58,11 +60,14 @@ const TaskList = () => {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [deleteUserLoading, setDeleteUserLoading] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [activity, setActivity] = useState([]);
 
   const token = localStorage.getItem("token");
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showDashboard, setShowDashboard] = useState(true);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -72,8 +77,10 @@ const TaskList = () => {
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
       setIsAdmin(payload.role === "Admin");
-    } catch {
+      console.log("[DEBUG] isAdmin:", payload.role === "Admin", "token:", token, "payload:", payload);
+    } catch (e) {
       setIsAdmin(false);
+      console.log("[DEBUG] Failed to parse token for admin check", e, token);
     }
   }, [token]);
 
@@ -122,6 +129,19 @@ const TaskList = () => {
     setSelectedTaskIdx(idx);
     setSelectedTask(null);
     setShowForm(false);
+    // Fetch comments and activity for the selected task
+    const task = tasks[idx];
+    if (task && task.id) {
+      axios.get(`http://localhost:8001/tasks/${task.id}/comments`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setComments(res.data))
+        .catch(() => setComments([]));
+      axios.get(`http://localhost:8001/tasks/${task.id}/activity`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setActivity(res.data))
+        .catch(() => setActivity([]));
+    } else {
+      setComments([]);
+      setActivity([]);
+    }
   };
 
   // Show form for editing selected task
@@ -169,6 +189,12 @@ const TaskList = () => {
           <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 2, mb: 2 }}>
             <Button
               variant="contained"
+              color={showDashboard ? "primary" : "secondary"}
+              sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
+              onClick={() => setShowDashboard(d => !d)}
+            >{showDashboard ? "Hide Dashboard" : "Show Dashboard"}</Button>
+            <Button
+              variant="contained"
               color="success"
               sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
               onClick={() => window.location.href = "/admin/register"}
@@ -211,7 +237,7 @@ const TaskList = () => {
             </Button>
           </Box>
         )}
-        {isAdmin && users.length > 0 && (
+        {isAdmin && users.length > 0 && !showDashboard && (
           <Button
             variant="contained"
             color="primary"
@@ -229,39 +255,45 @@ const TaskList = () => {
             {showForm ? "Cancel" : "Add Task (Other User)"}
           </Button>
         )}
+        {/* Admin Dashboard */}
+        {isAdmin && showDashboard && (
+          <AdminDashboard token={token} selectedUser={selectedUser} />
+        )}
         {/* Tabs for each task (filtered for admin) */}
-        <Tabs
-          value={selectedTaskIdx}
-          onChange={handleTabClick}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ mb: 3, bgcolor: "#f3f6fd", borderRadius: 2 }}
-        >
-          {tasks
-            .filter(task => {
-              if (isAdmin) {
-                // Only show tasks where owner is null or owner is admin (admin's own tasks)
-                const payload = JSON.parse(atob(token.split(".")[1]));
-                return !task.owner || task.owner === payload.sub;
-              }
-              return true;
-            })
-            .map((task, idx) => (
-              <Tab
-                key={task.id}
-                label={task.title}
-                sx={{
-                  fontWeight: selectedTaskIdx === idx ? 700 : 500,
-                  color: selectedTaskIdx === idx ? "primary.dark" : "#555",
-                  minWidth: 80,
-                  borderRadius: 2,
-                  mx: 0.5,
-                }}
-              />
-            ))}
-        </Tabs>
-        {/* Show selected task details (not for admin) */}
-        {!isAdmin && tasks.length > 0 && !showForm && (
+        {!showDashboard && (
+          <Tabs
+            value={selectedTaskIdx}
+            onChange={handleTabClick}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ mb: 3, bgcolor: "#f3f6fd", borderRadius: 2 }}
+          >
+            {tasks
+              .filter(task => {
+                if (isAdmin) {
+                  // Only show tasks where owner is null or owner is admin (admin's own tasks)
+                  const payload = JSON.parse(atob(token.split(".")[1]));
+                  return !task.owner || task.owner === payload.sub;
+                }
+                return true;
+              })
+              .map((task, idx) => (
+                <Tab
+                  key={task.id}
+                  label={task.title}
+                  sx={{
+                    fontWeight: selectedTaskIdx === idx ? 700 : 500,
+                    color: selectedTaskIdx === idx ? "primary.dark" : "#555",
+                    minWidth: 80,
+                    borderRadius: 2,
+                    mx: 0.5,
+                  }}
+                />
+              ))}
+          </Tabs>
+        )}
+        {/* Show selected task details (for both users and admins) */}
+        {tasks.length > 0 && !showForm && (
           <Card sx={{ mb: 3, boxShadow: 3, borderRadius: 3 }}>
             <CardContent>
               <Typography variant="h6" color="primary" gutterBottom>{tasks[selectedTaskIdx].title}</Typography>
@@ -276,6 +308,28 @@ const TaskList = () => {
                 sx={{ mt: 2, borderRadius: 2, fontWeight: 600, px: 3, boxShadow: 1 }}
                 onClick={handleEditClick}
               >Edit Task</Button>
+              {/* Comments and Activity Log */}
+              <Card sx={{ mt: 3, mb: 1, boxShadow: 1, borderRadius: 2 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" color="primary" gutterBottom>Comments</Typography>
+                  {comments.length === 0 && <Typography color="text.secondary">No comments yet.</Typography>}
+                  {comments.map(c => (
+                    <Box key={c.id} sx={{ mb: 1, pl: 1, borderLeft: "3px solid #e0e7ef" }}>
+                      <Typography variant="body2"><b>{c.user}</b> <span style={{ color: '#888', fontSize: 12 }}>({new Date(c.timestamp).toLocaleString()})</span></Typography>
+                      <Typography variant="body2">{c.comment}</Typography>
+                    </Box>
+                  ))}
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="subtitle1" color="primary" gutterBottom>Activity Log</Typography>
+                  {activity.length === 0 && <Typography color="text.secondary">No activity yet.</Typography>}
+                  {activity.map(a => (
+                    <Box key={a.id} sx={{ mb: 1, pl: 1, borderLeft: "3px solid #e0e7ef" }}>
+                      <Typography variant="body2"><b>{a.user}</b> <span style={{ color: '#888', fontSize: 12 }}>({new Date(a.timestamp).toLocaleString()})</span></Typography>
+                      <Typography variant="body2">[{a.action}] {a.detail}</Typography>
+                    </Box>
+                  ))}
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         )}
