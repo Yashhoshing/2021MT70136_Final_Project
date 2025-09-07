@@ -103,11 +103,8 @@ def delete_user(username: str, user_and_role: tuple = Depends(get_current_user_a
 def get_tasks(db: Session = Depends(get_db), user_and_role: tuple = Depends(get_current_user_and_role), user: str = None):
     username, role = user_and_role
     if role == "Admin" and user:
-        print("Admin fetching tasks for user:", user)
         return db.query(models.Task).filter(models.Task.owner == user).all()
     elif role == "Admin":
-        print("Admin fetching all tasks")
-        print( db.query(models.Task).all())
         return db.query(models.Task).all()
     else:
         return db.query(models.Task).filter(models.Task.owner == username).all()
