@@ -31,4 +31,4 @@ pipeline {
     }
 // Jenkins Pipeline: Build Docker Images Only
 // This pipeline checks out the code and builds Docker images for task_service, user_service, and frontend.
-// No tests or analysis are run. Use this to verify Docker builds work before adding more steps.
+// No tests or analysis are run. Use this to verify Docker builds work before adding more step
