@@ -6,7 +6,7 @@ pipeline {
     FRONTEND_DIR = 'task-management-app/frontend'
   }
   stages {
-    stage('Checkout') {
+    stage('Checkout: SCM') {
       steps {
         checkout scm
       }
