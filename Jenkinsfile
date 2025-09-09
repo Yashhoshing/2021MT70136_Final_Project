@@ -11,24 +11,17 @@ pipeline {
         checkout scm
       }
     }
-    stage('Task Service: Install & Test') {
+    stage('Build Docker Images') {
       steps {
-        dir(env.TASK_BACKEND_DIR) {
-          sh 'pip install --upgrade pip'
-          sh 'pip install -r requirements.txt'
-          sh 'pytest'
-        }
+        sh 'docker build -t taskmgmt-task-backend:latest ./task-management-app/backend/task_service'
+        sh 'docker build -t taskmgmt-user-backend:latest ./task-management-app/backend/user_service'
+        sh 'docker build -t taskmgmt-frontend:latest ./task-management-app/frontend'
       }
     }
-    stage('User Service: Install & Test') {
-      steps {
-        dir(env.USER_BACKEND_DIR) {
-          sh 'pip install --upgrade pip'
-          sh 'pip install -r requirements.txt'
-          sh 'pytest'
-        }
-      }
+  }
+  post {
+    always {
+      cleanWs()
     }
-// Jenkins Pipeline: Build Docker Images Only
-// This pipeline checks out the code and builds Docker images for task_service, user_service, and frontend.
-// No tests or analysis are run. Use this to verify Docker builds work before adding more step
+  }
+}
