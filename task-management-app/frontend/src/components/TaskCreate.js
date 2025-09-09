@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Box, Button, TextField, MenuItem, CircularProgress, Autocomplete, Snackbar, Alert, Card, CardContent, Typography, Divider } from "@mui/material";
 
-const TaskCreate = ({ onTaskCreated, initialTask, isAdmin, users }) => {
+const TaskCreate = ({ onTaskCreated, initialTask, isAdmin, users, onCancel }) => {
   const isEdit = !!initialTask;
   const [newTask, setNewTask] = useState({
     title: initialTask?.title || "",
@@ -143,7 +143,7 @@ const TaskCreate = ({ onTaskCreated, initialTask, isAdmin, users }) => {
         value={newTask.status}
         onChange={handleChange}
         required
-        disabled={isNormalUserEdit}
+        disabled={isAdmin && !isEdit}
       >
         <MenuItem value="To Do">To Do</MenuItem>
         <MenuItem value="In Progress">In Progress</MenuItem>
@@ -180,6 +180,15 @@ const TaskCreate = ({ onTaskCreated, initialTask, isAdmin, users }) => {
         disabled={loading || (isNormalUser && !isEdit)}
       >
         {loading ? <CircularProgress size={22} color="inherit" /> : isEdit ? "Save" : "Create"}
+      </Button>
+      <Button
+        type="button"
+        variant="outlined"
+        color="error"
+        sx={{ borderRadius: 2, fontWeight: 600, px: 3, boxShadow: 1 }}
+        onClick={onCancel}
+      >
+        Cancel
       </Button>
 
       {/* Show previous comments and activity log */}

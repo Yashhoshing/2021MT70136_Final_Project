@@ -29,6 +29,7 @@ const ProgressBar = ({ progress, status }) => {
   let bgColor = "#ef4444";
   if (progress > 70) bgColor = "#22c55e";
   else if (progress > 30) bgColor = "#facc15";
+
   return (
     <Box sx={{ height: 16, width: "100%", bgcolor: "#e0e7ef", borderRadius: 2, mt: 1, overflow: "hidden" }}>
       <Box
@@ -55,6 +56,7 @@ const ProgressBar = ({ progress, status }) => {
 const TaskList = () => {
   const [tasks, setTasks] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [isAddMode, setIsAddMode] = useState(false);
   const [selectedTaskIdx, setSelectedTaskIdx] = useState(0);
   const [selectedTask, setSelectedTask] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -67,7 +69,9 @@ const TaskList = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [showDashboard, setShowDashboard] = useState(true);
+  const [showUserTasks, setShowUserTasks] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(true); // Default to dashboard
+  const [showDeleteUser, setShowDeleteUser] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -76,10 +80,13 @@ const TaskList = () => {
     if (!token) return;
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
-      setIsAdmin(payload.role === "Admin");
-      console.log("[DEBUG] isAdmin:", payload.role === "Admin", "token:", token, "payload:", payload);
+      const isAdminVal = payload.role === "Admin";
+      setIsAdmin(isAdminVal);
+      setShowDashboard(isAdminVal); // Show dashboard by default for admin
+      console.log("[DEBUG] isAdmin:", isAdminVal, "token:", token, "payload:", payload);
     } catch (e) {
       setIsAdmin(false);
+      setShowDashboard(false);
       console.log("[DEBUG] Failed to parse token for admin check", e, token);
     }
   }, [token]);
@@ -114,15 +121,62 @@ const TaskList = () => {
       })
       .then((res) => {
         setTasks(res.data);
+        // Determine the correct selected index
+        let newIdx = 0;
         setSelectedTaskIdx(idx => {
           if (res.data.length === 0) return 0;
           if (idx >= res.data.length) return res.data.length - 1;
           return idx;
         });
+        if (res.data.length === 0) {
+          setComments([]);
+          setActivity([]);
+        } else {
+          // Use the same logic as setSelectedTaskIdx to get the actual selected index
+          newIdx = selectedTaskIdx;
+          if (newIdx >= res.data.length) newIdx = res.data.length - 1;
+          if (newIdx < 0) newIdx = 0;
+          const task = res.data[newIdx];
+          axios.get(`http://localhost:8001/tasks/${task.id}/comments`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => setComments(r.data))
+            .catch(() => setComments([]));
+          axios.get(`http://localhost:8001/tasks/${task.id}/activity`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => setActivity(r.data))
+            .catch(() => setActivity([]));
+        }
       })
-      .catch(() => setTasks([]))
+      .catch(() => {
+        setTasks([]);
+        setComments([]);
+        setActivity([]);
+      })
       .finally(() => setLoading(false));
   }, [token, isAdmin, selectedUser]);
+
+  // Fetch comments and activity for the selected task
+  useEffect(() => {
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+    if (!tasks || tasks.length === 0) {
+      setComments([]);
+      setActivity([]);
+      return;
+    }
+    const task = tasks[selectedTaskIdx];
+    if (!task || !task.id) {
+      setComments([]);
+      setActivity([]);
+      return;
+    }
+    axios.get(`http://localhost:8001/tasks/${task.id}/comments`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setComments(r.data))
+      .catch(() => setComments([]));
+    axios.get(`http://localhost:8001/tasks/${task.id}/activity`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => setActivity(r.data))
+      .catch(() => setActivity([]));
+  }, [selectedTaskIdx, tasks, token]);
 
   // Tab switching handler
   const handleTabClick = (event, idx) => {
@@ -150,6 +204,12 @@ const TaskList = () => {
     setShowForm(true);
   };
 
+  const handleAddClick = (flag) => {
+    setSelectedTask(null);
+    setShowForm(true);
+    setIsAddMode(flag);
+  };
+
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f3f6fd", p: isMobile ? 1 : 4 }}>
       <Snackbar
@@ -171,96 +231,102 @@ const TaskList = () => {
           p: isMobile ? 2 : 6,
         }}
       >
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-          <Typography variant="h5" fontWeight={700} color="primary.dark">
-            {isAdmin ? "Admin Task Management" : "Your Tasks"}
-          </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 2 }}>
           <Button
             variant="contained"
             color="error"
-            sx={{ borderRadius: 2, fontWeight: 600, px: 3, boxShadow: 1 }}
+            sx={{ borderRadius: 2, fontWeight: 600, px: 3, boxShadow: 1, ml: 2 }}
             onClick={() => {
               localStorage.removeItem("token");
               window.location.href = "/login";
             }}
           >Logout</Button>
         </Box>
-        {isAdmin && (
-          <Box sx={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 2, mb: 2 }}>
-            <Button
-              variant="contained"
-              color={showDashboard ? "primary" : "secondary"}
-              sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
-              onClick={() => setShowDashboard(d => !d)}
-            >{showDashboard ? "Hide Dashboard" : "Show Dashboard"}</Button>
-            <Button
-              variant="contained"
-              color="success"
-              sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
-              onClick={() => window.location.href = "/admin/register"}
-            >Add User</Button>
-            <Autocomplete
-              options={users}
-              getOptionLabel={u => u.username}
-              value={selectedUser}
-              onChange={(_, val) => setSelectedUser(val)}
-              sx={{ minWidth: 220, bgcolor: "#f3f6fd", borderRadius: 2 }}
-              renderInput={params => <TextField {...params} label="Select user to delete" variant="outlined" size="small" />}
-              isOptionEqualToValue={(option, value) => option?.username === value?.username}
-              disableClearable={false}
-            />
-            <Button
-              variant="contained"
-              color="error"
-              sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
-              disabled={!selectedUser || deleteUserLoading}
-              onClick={async () => {
-                if (!selectedUser) return setSnackbar({ open: true, message: "Select a user to delete.", severity: "warning" });
-                if (!window.confirm(`Are you sure you want to delete user '${selectedUser.username}'? This will also delete their tasks.`)) return;
-                setDeleteUserLoading(true);
-                try {
-                  await axios.delete(`http://localhost:8001/users/${selectedUser.username}`, { headers: { Authorization: `Bearer ${token}` } });
-                  setSnackbar({ open: true, message: "User deleted!", severity: "success" });
-                  // Refresh users
-                  const res = await axios.get("http://localhost:8001/users", { headers: { Authorization: `Bearer ${token}` } });
-                  const payload = JSON.parse(atob(token.split(".")[1]));
-                  setUsers(res.data.filter(u => u.username !== payload.sub));
-                  setSelectedUser(null);
-                } catch (err) {
-                  setSnackbar({ open: true, message: "Failed to delete user: " + (err.response?.data?.detail || err.message), severity: "error" });
-                } finally {
-                  setDeleteUserLoading(false);
-                }
-              }}
-            >
-              {deleteUserLoading ? <CircularProgress size={22} color="inherit" /> : "Delete User"}
-            </Button>
+        {/* Second row: Task List toggle left, user actions right */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          {/* Left: Task List/Dashboard toggle */}
+          <Box>
+            {isAdmin && (
+              <Button
+                variant="contained"
+                color="primary"
+                sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
+                onClick={() => setShowDashboard(d => !d)}
+              >{showDashboard ? "Task List" : "Go To Dashboard"}</Button>
+            )}
           </Box>
-        )}
-        {isAdmin && users.length > 0 && !showDashboard && (
-          <Button
-            variant="contained"
-            color="primary"
-            sx={{ borderRadius: 2, fontWeight: 600, px: 3, my: 2, boxShadow: 1 }}
-            onClick={() => {
-              if (showForm) {
-                setShowForm(false);
-                setSelectedTask(null);
-              } else {
-                setShowForm(true);
-                setSelectedTask(null);
-              }
-            }}
-          >
-            {showForm ? "Cancel" : "Add Task (Other User)"}
-          </Button>
-        )}
+          {/* Right: User dropdown, Add Task, Add User, Delete User */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {isAdmin && (
+              <Autocomplete
+                options={users}
+                getOptionLabel={u => u.username}
+                value={selectedUser}
+                onChange={(_, val) => {
+                  setSelectedUser(val);
+                  setShowForm(false);
+                  setSelectedTaskIdx(0);
+                }}
+                sx={{ minWidth: 220, bgcolor: "#f3f6fd", borderRadius: 2 }}
+                renderInput={params => <TextField {...params} label="Select user" variant="outlined" size="small" />}
+                isOptionEqualToValue={(option, value) => option?.username === value?.username}
+                disableClearable={false}
+              />
+            )}
+            {isAdmin && !showDashboard && (
+              <Button
+                variant="contained"
+                color="success"
+                sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
+                onClick={() => handleAddClick(true)}
+                disabled={!selectedUser}
+              >Add Task</Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="contained"
+                color="error"
+                sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
+                disabled={!selectedUser || deleteUserLoading}
+                onClick={async () => {
+                  if (!selectedUser) return setSnackbar({ open: true, message: "Select a user to delete.", severity: "warning" });
+                  if (!window.confirm(`Are you sure you want to delete user '${selectedUser.username}'? This will also delete their tasks.`)) return;
+                  setDeleteUserLoading(true);
+                  try {
+                    await axios.delete(`http://localhost:8001/users/${selectedUser.username}`, { headers: { Authorization: `Bearer ${token}` } });
+                    setSnackbar({ open: true, message: "User deleted!", severity: "success" });
+                    // Refresh users
+                    const res = await axios.get("http://localhost:8001/users", { headers: { Authorization: `Bearer ${token}` } });
+                    const payload = JSON.parse(atob(token.split(".")[1]));
+                    setUsers(res.data.filter(u => u.username !== payload.sub));
+                    setSelectedUser(null);
+                  } catch (err) {
+                    setSnackbar({ open: true, message: "Failed to delete user: " + (err.response?.data?.detail || err.message), severity: "error" });
+                  } finally {
+                    setDeleteUserLoading(false);
+                  }
+                }}
+              >
+                {deleteUserLoading ? <CircularProgress size={22} color="inherit" /> : "Delete User"}
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="contained"
+                color="success"
+                sx={{ borderRadius: 2, fontWeight: 600, minWidth: 120, boxShadow: 1 }}
+                onClick={() => window.location.href = "/admin/register"}
+              >Add User</Button>
+            )}
+          </Box>
+        </Box>
+
         {/* Admin Dashboard */}
         {isAdmin && showDashboard && (
           <AdminDashboard token={token} selectedUser={selectedUser} />
         )}
-        {/* Tabs for each task (filtered for admin) */}
-        {!showDashboard && (
+        {/* Tabs for each task for selected user (admin) or self (user) */}
+        {!showDashboard && !isAddMode && ((isAdmin && selectedUser) || !isAdmin) && (
           <Tabs
             value={selectedTaskIdx}
             onChange={handleTabClick}
@@ -268,32 +334,23 @@ const TaskList = () => {
             scrollButtons="auto"
             sx={{ mb: 3, bgcolor: "#f3f6fd", borderRadius: 2 }}
           >
-            {tasks
-              .filter(task => {
-                if (isAdmin) {
-                  // Only show tasks where owner is null or owner is admin (admin's own tasks)
-                  const payload = JSON.parse(atob(token.split(".")[1]));
-                  return !task.owner || task.owner === payload.sub;
-                }
-                return true;
-              })
-              .map((task, idx) => (
-                <Tab
-                  key={task.id}
-                  label={task.title}
-                  sx={{
-                    fontWeight: selectedTaskIdx === idx ? 700 : 500,
-                    color: selectedTaskIdx === idx ? "primary.dark" : "#555",
-                    minWidth: 80,
-                    borderRadius: 2,
-                    mx: 0.5,
-                  }}
-                />
-              ))}
+            {tasks.map((task, idx) => (
+              <Tab
+                key={task.id}
+                label={task.title}
+                sx={{
+                  fontWeight: selectedTaskIdx === idx ? 700 : 500,
+                  color: selectedTaskIdx === idx ? "primary.dark" : "#555",
+                  minWidth: 80,
+                  borderRadius: 2,
+                  mx: 0.5,
+                }}
+              />
+            ))}
           </Tabs>
         )}
         {/* Show selected task details (for both users and admins) */}
-        {tasks.length > 0 && !showForm && (
+  {tasks.length > 0 && !showForm && !showDashboard && ((isAdmin && selectedUser) || !isAdmin) && (
           <Card sx={{ mb: 3, boxShadow: 3, borderRadius: 3 }}>
             <CardContent>
               <Typography variant="h6" color="primary" gutterBottom>{tasks[selectedTaskIdx].title}</Typography>
@@ -334,16 +391,19 @@ const TaskList = () => {
           </Card>
         )}
         {/* Show form for add/edit */}
-        {showForm && (
+  {showForm && !showDashboard && (
           <Card sx={{ mb: 3, boxShadow: 3, borderRadius: 3 }}>
             <CardContent>
               <TaskCreate
                 onTaskCreated={() => {
                   setShowForm(false);
                   setSelectedTask(null);
-                  // Refresh tasks after creation
+                  // Refresh tasks after creation or edit
                   let url = "http://localhost:8001/tasks";
                   let params = {};
+                  if (isAdmin && selectedUser) {
+                    params.user = selectedUser.username;
+                  }
                   axios
                     .get(url, {
                       headers: { Authorization: `Bearer ${token}` },
@@ -353,6 +413,11 @@ const TaskList = () => {
                       setTasks(res.data);
                       setSelectedTaskIdx(res.data.length > 0 ? res.data.length - 1 : 0);
                     });
+                }}
+                onCancel={() => {
+                  setShowForm(false);
+                  setSelectedTask(null);
+                  setIsAddMode(false);
                 }}
                 initialTask={selectedTask}
                 isAdmin={isAdmin}
