@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Box, Card, CardContent, Typography, TextField, Button, Snackbar, Alert, MenuItem } from "@mui/material";
+import { Box, Card, CardContent, Typography, TextField, Button, Snackbar, Alert, MenuItem, CircularProgress } from "@mui/material";
 
 const Register = ({ isAdminRegister }) => {
   const [username, setUsername] = useState("");
@@ -10,25 +10,32 @@ const Register = ({ isAdminRegister }) => {
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     let isAdminUser = false;
+    console.log("isaaaaaaaaaa")
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
+        console.log("Payload:", payload);
         isAdminUser = payload.role === "Admin";
       } catch {
         isAdminUser = false;
       }
     }
-    axios.get("http://localhost:8000/me")
+    axios.get("http://localhost:8000/me", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
       .then(() => {
         setIsAdmin(isAdminUser);
+        console.log("User exists, isAdmin:", isAdminUser);
       })
       .catch(() => {
         axios.get("http://localhost:8000/users/count")
           .then(res => {
             if (res.data.count === 0) {
+              console.log("No users exist, allowing admin registration.");
               setIsAdmin(true);
             } else {
               setIsAdmin(isAdminUser);
@@ -45,6 +52,10 @@ const Register = ({ isAdminRegister }) => {
       const token = localStorage.getItem("token");
       const countRes = await axios.get("http://localhost:8000/users/count");
       console.log("User count:", countRes.data.count);
+      console.log("Is Admin Register:", isAdminRegister);
+      console.log("Token:", token);
+      console.log("Username:", username);
+      console.log("Role:", role);
       if (countRes.data.count === 0) {
         await axios.post("http://localhost:8000/register", { username, password, role });
       } else {

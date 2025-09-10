@@ -1,3 +1,4 @@
+import time
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -21,7 +22,10 @@ app = FastAPI()
 print("-----------------",app)
 # Helper to count users
 def get_user_count(db: Session):
-    return db.query(models.User).count()
+    count1=db.query(models.User).count()
+    time.sleep(3)  # Simulate delay
+    print("User count--", count1)
+    return count1
 
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,7 +37,6 @@ app.add_middleware(
     allow_methods=["*"],  # Or ["POST", "GET", "OPTIONS"], etc.
     allow_headers=["*"],
 )
-
 
 
 
@@ -76,6 +79,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 # Allow first user to register as admin if no users exist
 @app.post("/register", response_model=schemas.UserOut)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    print("user registration attempt:", user.username)
     if get_user_count(db) > 0:
         raise HTTPException(status_code=403, detail="Direct registration is disabled. Only Admin can register new users.")
     if get_user(db, user.username):
@@ -124,4 +128,6 @@ def read_me(current_user: models.User = Depends(get_current_user)):
 @app.get("/users/count")
 def get_users_count(db: Session = Depends(get_db)):
     count = db.query(models.User).count()
+    time.sleep(2)  # Simulate delay
+    print("User count-", count)
     return {"count": count}
