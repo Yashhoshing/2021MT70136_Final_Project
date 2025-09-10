@@ -11,11 +11,12 @@ pipeline {
     FRONTEND_DIR = 'task-management-app/frontend'
   }
   stages {
-    stage('Checkout') {
+    stage('Checkout: SCM') {
       steps {
         checkout scm
       }
     }
+    
     stage('Build Docker Images') {
       steps {
         bat "docker build -t %BACKEND_IMAGE% ./%BACKEND_DIR%"
@@ -61,3 +62,4 @@ pipeline {
     }
   }
 }
+
