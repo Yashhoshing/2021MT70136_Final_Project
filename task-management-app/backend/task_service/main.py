@@ -3,13 +3,9 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
-from . import models, schemas, database
-# from task_service import models, schemas, database
-# import models, database, schemas
-import sys
-sys.path.append(r"C:\Users\Lenovo\Desktop\Bits\Project\task-management-app\backend\user_service")
-import models as user_models
-import database as user_database
+from task_service import models, schemas, database
+from user_service import models as user_models, database as user_database
+# from . import models, schemas, database
 from fastapi.middleware.cors import CORSMiddleware
 
 SECRET_KEY = "your-very-secret-key"
