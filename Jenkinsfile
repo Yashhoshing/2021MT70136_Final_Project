@@ -1,15 +1,14 @@
 pipeline {
   agent any
   environment {
-    DOCKERHUB_USER = 'your-dockerhub-username' // Set your Docker Hub username
+    DOCKERHUB_USER = 'YH12Devops' // Set your Docker Hub username
     DOCKERHUB_PASS = credentials('dockerhub-password-id') // Jenkins credential ID for Docker Hub password
-    BACKEND_IMAGE = "${DOCKERHUB_USER}/taskmgmt-backend:latest"
-    USER_IMAGE = "${DOCKERHUB_USER}/taskmgmt-user-backend:latest"
-    FRONTEND_IMAGE = "${DOCKERHUB_USER}/taskmgmt-frontend:latest"
+    BACKEND_IMAGE = "docker.io/${DOCKERHUB_USER}/taskmgmt-backend:latest"
+    USER_IMAGE = "docker.io/${DOCKERHUB_USER}/taskmgmt-user-backend:latest"
+    FRONTEND_IMAGE = "docker.io/${DOCKERHUB_USER}/taskmgmt-frontend:latest"
     BACKEND_DIR = 'task-management-app/backend/task_service'
     USER_DIR = 'task-management-app/backend/user_service'
     FRONTEND_DIR = 'task-management-app/frontend'
-    DOCKER_REGISTRY = 'YH12Devops'
   }
   stages {
     stage('Checkout: SCM') {
@@ -27,7 +26,7 @@ pipeline {
     }
     stage('Login to Docker Hub') {
       steps {
-        bat "echo %DOCKERHUB_PASS% | docker login YH12Devops -u %DOCKERHUB_USER% --password-stdin"
+        bat "echo %DOCKERHUB_PASS% | docker login docker.io -u %DOCKERHUB_USER% --password-stdin"
       }
     }
     stage('Push Images to Docker Hub') {
