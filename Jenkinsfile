@@ -1,7 +1,7 @@
 pipeline {
   agent any
   environment {
-    DOCKERHUB_USER = 'YH12Devops' // Set your Docker Hub username
+    DOCKERHUB_USER = 'yh12devops' 
     DOCKERHUB_PASS = credentials('dockerhub-password-id') // Jenkins credential ID for Docker Hub password
     BACKEND_IMAGE = "docker.io/${DOCKERHUB_USER}/taskmgmt-backend:latest"
     USER_IMAGE = "docker.io/${DOCKERHUB_USER}/taskmgmt-user-backend:latest"
