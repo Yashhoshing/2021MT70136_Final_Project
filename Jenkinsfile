@@ -26,7 +26,7 @@ pipeline {
     }
     stage('Login to Docker Hub') {
       steps {
-        bat "echo %DOCKERHUB_PASS% | docker login docker.io -u %DOCKERHUB_USER% --password-stdin"
+        bat "echo dckr_pat_Z7QW__nfFrcZDGEayHh3z2nTo2g| docker login docker.io -u yh12devops --password-stdin"
       }
     }
     stage('Push Images to Docker Hub') {
